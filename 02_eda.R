@@ -1,6 +1,6 @@
 # =============================================================
 # 02_eda.R
-# Orquestador del analisis exploratorio de series temporales
+# Orquestador del EDA sobre log-retornos
 # =============================================================
 
 source("R/scripts/00_config.R")
@@ -10,12 +10,11 @@ library(xts); library(zoo); library(here); library(ggplot2)
 
 set.seed(SEED)
 
-# --- 0. Carga de datos procesados (Fase 2) ---
-prices  <- readRDS(here::here("data", "processed", "prices_clean.rds"))
+# --- 0. Carga de log-retornos (Fase 2) ---
 returns <- readRDS(here::here("data", "processed", "log_returns.rds"))
 
 cat("\n=================================================\n")
-cat("        FASE 3 - ANALISIS EXPLORATORIO\n")
+cat("     FASE 3 - EDA SOBRE LOG-RETORNOS\n")
 cat("=================================================\n")
 
 # --- 1. Estadisticos descriptivos ---
@@ -26,15 +25,13 @@ write.csv(desc, here::here("outputs", "tables", "descriptive_stats.csv"),
 print(desc[, c("ticker", "n", "mean", "sd", "skewness",
                "excess_kurtosis", "ann_volatility", "normality")])
 
-# --- 2. Estacionariedad: precios vs log-retornos ---
+# --- 2. Estacionariedad de los retornos ---
 cat("\n[2/5] Tests de estacionariedad ...\n")
-stat_prices  <- run_stationarity_tests(prices,  label = "prices",  alpha = ALPHA)
-stat_returns <- run_stationarity_tests(returns, label = "returns", alpha = ALPHA)
-stationarity <- rbind(stat_prices, stat_returns)
+stationarity <- run_stationarity_tests(returns, alpha = ALPHA)
 write.csv(stationarity, here::here("outputs", "tables", "stationarity_tests.csv"),
           row.names = FALSE)
-print(stationarity[, c("series", "ticker", "adf_pvalue",
-                       "kpss_pvalue", "pp_pvalue", "conclusion")])
+print(stationarity[, c("ticker", "adf_pvalue", "kpss_pvalue",
+                       "pp_pvalue", "conclusion")])
 
 # --- 3. Autocorrelacion y efectos ARCH ---
 cat("\n[3/5] Tests de autocorrelacion y ARCH ...\n")
@@ -56,7 +53,7 @@ print(ob$summary)
 
 # --- 5. Visualizaciones ---
 cat("\n[5/5] Generando visualizaciones ...\n")
-plot_eda(prices, returns)
+plot_eda(returns)
 corr_matrix <- plot_correlation_matrix(returns)
 write.csv(round(corr_matrix, 4),
           here::here("outputs", "tables", "correlation_matrix.csv"))
@@ -67,7 +64,7 @@ cat("\n=================================================\n")
 cat("        SINTESIS PARA LA FASE 4\n")
 cat("=================================================\n")
 for (tkr in names(returns)) {
-  d_ret  <- subset(stationarity, ticker == tkr & series == "returns")
+  d_ret  <- subset(stationarity, ticker == tkr)
   arch_t <- subset(autocorr, ticker == tkr & test == "ARCH LM (Engle)")
   lb_r   <- subset(autocorr, ticker == tkr &
                      test == "Ljung-Box (r_t)" & lag == 10L)

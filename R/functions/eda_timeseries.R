@@ -1,8 +1,15 @@
 # =============================================================
 # eda_timeseries.R
-# Modulos de analisis exploratorio de series temporales
+# Modulos de analisis exploratorio de series de LOG-RETORNOS
 # Autor: Angel Sarria Jimenez
 # Proyecto: financial-timeseries-boxjenkins
+# -------------------------------------------------------------
+# Alcance: el analisis se realiza EXCLUSIVAMENTE sobre las series
+# de log-retornos, que constituyen el objeto de modelizacion
+# Box-Jenkins. Se asume, por resultado estandar de la literatura
+# financiera, que las series de precios son I(1); la validacion
+# empirica relevante es confirmar que sus log-retornos son I(0),
+# lo que verifica run_stationarity_tests().
 # =============================================================
 
 # -------------------------------------------------------------
@@ -68,32 +75,32 @@ compute_descriptive_stats <- function(returns_list) {
 
 
 # -------------------------------------------------------------
-# 2. TESTS DE ESTACIONARIEDAD
+# 2. TESTS DE ESTACIONARIEDAD (sobre log-retornos)
 # -------------------------------------------------------------
 
-#' Aplica la bateria conjunta ADF / KPSS / Phillips-Perron
+#' Aplica la bateria conjunta ADF / KPSS / Phillips-Perron a los retornos
 #'
 #' Los tres tests se interpretan de forma conjunta. ADF y PP tienen
 #' H0 = raiz unitaria (no estacionariedad); KPSS tiene H0 = estacionariedad.
-#' La columna 'conclusion' resuelve la matriz de decision.
+#' La columna 'conclusion' resuelve la matriz de decision. El resultado
+#' esperado y necesario para modelizar con d = 0 es I(0) por consenso.
 #'
 #' Advertencia tecnica: tseries acota los p-valores al rango tabulado
 #' [0.01, 0.10] y emite un warning cuando el estadistico cae fuera. Se
-#' suprime el warning y se registra el p-valor acotado, que es la practica
-#' habitual; un p-valor de 0.01 debe leerse como "<= 0.01".
+#' suprime el warning y se registra el p-valor acotado; un p-valor de
+#' 0.01 debe leerse como "<= 0.01".
 #'
-#' @param series_list list. Lista nombrada de xts.
-#' @param label       character. Etiqueta descriptiva ("prices" o "returns").
-#' @param alpha       numeric. Nivel de significacion.
+#' @param returns_list list. Lista nombrada de xts de log-retornos.
+#' @param alpha        numeric. Nivel de significacion.
 #' @return data.frame con resultados y conclusion por activo.
-run_stationarity_tests <- function(series_list, label = "returns", alpha = 0.05) {
+run_stationarity_tests <- function(returns_list, alpha = 0.05) {
   
-  stopifnot(is.list(series_list), length(series_list) >= 1)
+  stopifnot(is.list(returns_list), length(returns_list) >= 1)
   out <- data.frame()
   
-  for (tkr in names(series_list)) {
+  for (tkr in names(returns_list)) {
     
-    x <- as.numeric(series_list[[tkr]])
+    x <- as.numeric(returns_list[[tkr]])
     x <- x[is.finite(x)]
     
     adf  <- suppressWarnings(tseries::adf.test(x))
@@ -115,7 +122,7 @@ run_stationarity_tests <- function(series_list, label = "returns", alpha = 0.05)
     }
     
     out <- rbind(out, data.frame(
-      series          = label,
+      series          = "log_returns",
       ticker          = tkr,
       n               = length(x),
       adf_stat        = as.numeric(adf$statistic),
@@ -245,7 +252,7 @@ detect_outliers_breaks <- function(returns_list,
                                    z_threshold = 3,
                                    iqr_factor  = 1.5) {
   
-  summary_df <- data.frame()
+  summary_df  <- data.frame()
   extremes_df <- data.frame()
   
   for (tkr in names(returns_list)) {
@@ -257,8 +264,8 @@ detect_outliers_breaks <- function(returns_list,
     r   <- r[ok]; d <- d[ok]
     
     # z-score
-    z       <- (r - mean(r)) / sd(r)
-    out_z   <- abs(z) > z_threshold
+    z     <- (r - mean(r)) / sd(r)
+    out_z <- abs(z) > z_threshold
     
     # IQR
     q1  <- quantile(r, 0.25); q3 <- quantile(r, 0.75)
@@ -266,8 +273,8 @@ detect_outliers_breaks <- function(returns_list,
     out_iqr <- r < (q1 - iqr_factor * iqr) | r > (q3 + iqr_factor * iqr)
     
     # Ruptura estructural (OLS-CUSUM sobre la media)
-    cusum   <- strucchange::efp(r ~ 1, type = "OLS-CUSUM")
-    sct     <- strucchange::sctest(cusum)
+    cusum <- strucchange::efp(r ~ 1, type = "OLS-CUSUM")
+    sct   <- strucchange::sctest(cusum)
     
     summary_df <- rbind(summary_df, data.frame(
       ticker           = tkr,
@@ -301,22 +308,21 @@ detect_outliers_breaks <- function(returns_list,
 
 
 # -------------------------------------------------------------
-# 5. VISUALIZACIONES
+# 5. VISUALIZACIONES (sobre log-retornos)
 # -------------------------------------------------------------
 
-#' Genera y persiste el conjunto de graficos EDA por activo
+#' Genera y persiste el conjunto de graficos EDA de log-retornos por activo
 #'
-#' Produce por cada activo: serie de precios, serie de log-retornos,
-#' histograma con densidad normal superpuesta, Q-Q plot, ACF y PACF de
-#' retornos, y ACF de retornos al cuadrado.
+#' Produce por cada activo: serie de log-retornos, histograma con densidad
+#' normal superpuesta, Q-Q plot, ACF y PACF de retornos, y ACF de retornos
+#' al cuadrado. No genera graficos de precios: el analisis se centra en la
+#' serie objeto de modelizacion.
 #'
-#' @param prices_list  list. xts de precios limpios.
-#' @param returns_list list. xts de log-retornos.
+#' @param returns_list list. Lista nombrada de xts de log-retornos.
 #' @param outdir       character. Directorio de salida.
 #' @param max_lag      integer. Lags maximos en ACF/PACF.
 #' @return invisible(NULL). Efecto lateral: ficheros PNG.
-plot_eda <- function(prices_list,
-                     returns_list,
+plot_eda <- function(returns_list,
                      outdir  = here::here("outputs", "figures", "eda"),
                      max_lag = 40L) {
   
@@ -331,19 +337,9 @@ plot_eda <- function(prices_list,
     r   <- as.numeric(returns_list[[tkr]])
     r   <- r[is.finite(r)]
     
-    df_p <- data.frame(date  = zoo::index(prices_list[[tkr]]),
-                       price = as.numeric(prices_list[[tkr]]))
-    df_r <- data.frame(date  = zoo::index(returns_list[[tkr]]),
-                       ret   = as.numeric(returns_list[[tkr]]))
+    df_r <- data.frame(date = zoo::index(returns_list[[tkr]]),
+                       ret  = as.numeric(returns_list[[tkr]]))
     df_r <- df_r[is.finite(df_r$ret), ]
-    
-    # Serie de precios
-    sv(ggplot2::ggplot(df_p, ggplot2::aes(date, price)) +
-         ggplot2::geom_line(linewidth = 0.4, colour = "#1f4e79") +
-         ggplot2::labs(title = paste("Serie de precios -", tkr),
-                       x = NULL, y = "Precio ajustado") +
-         ggplot2::theme_minimal(base_size = 11),
-       sprintf("%s_01_precios.png", tag))
     
     # Serie de log-retornos
     sv(ggplot2::ggplot(df_r, ggplot2::aes(date, ret)) +
@@ -352,7 +348,7 @@ plot_eda <- function(prices_list,
                        subtitle = "Clustering de volatilidad visible en periodos de estres",
                        x = NULL, y = expression(r[t])) +
          ggplot2::theme_minimal(base_size = 11),
-       sprintf("%s_02_retornos.png", tag))
+       sprintf("%s_01_retornos.png", tag))
     
     # Histograma vs normal
     sv(ggplot2::ggplot(df_r, ggplot2::aes(ret)) +
@@ -365,7 +361,7 @@ plot_eda <- function(prices_list,
                        subtitle = "Curva roja: densidad normal ajustada",
                        x = expression(r[t]), y = "Densidad") +
          ggplot2::theme_minimal(base_size = 11),
-       sprintf("%s_03_histograma.png", tag), w = 8, h = 5)
+       sprintf("%s_02_histograma.png", tag), w = 8, h = 5)
     
     # Q-Q plot
     sv(ggplot2::ggplot(df_r, ggplot2::aes(sample = ret)) +
@@ -375,25 +371,25 @@ plot_eda <- function(prices_list,
                        subtitle = "Desviaciones en las colas indican leptocurtosis",
                        x = "Cuantiles teoricos", y = "Cuantiles muestrales") +
          ggplot2::theme_minimal(base_size = 11),
-       sprintf("%s_04_qqplot.png", tag), w = 6, h = 5)
+       sprintf("%s_03_qqplot.png", tag), w = 6, h = 5)
     
     # ACF y PACF de retornos
     sv(forecast::ggAcf(r, lag.max = max_lag) +
          ggplot2::labs(title = paste("ACF de log-retornos -", tkr)) +
          ggplot2::theme_minimal(base_size = 11),
-       sprintf("%s_05_acf.png", tag), w = 8, h = 4)
+       sprintf("%s_04_acf.png", tag), w = 8, h = 4)
     
     sv(forecast::ggPacf(r, lag.max = max_lag) +
          ggplot2::labs(title = paste("PACF de log-retornos -", tkr)) +
          ggplot2::theme_minimal(base_size = 11),
-       sprintf("%s_06_pacf.png", tag), w = 8, h = 4)
+       sprintf("%s_05_pacf.png", tag), w = 8, h = 4)
     
     # ACF de retornos al cuadrado (diagnostico ARCH)
     sv(forecast::ggAcf(r^2, lag.max = max_lag) +
          ggplot2::labs(title = paste("ACF de log-retornos al cuadrado -", tkr),
                        subtitle = "Significacion persistente = heterocedasticidad condicional") +
          ggplot2::theme_minimal(base_size = 11),
-       sprintf("%s_07_acf_cuadrados.png", tag), w = 8, h = 4)
+       sprintf("%s_06_acf_cuadrados.png", tag), w = 8, h = 4)
     
     cat(sprintf("   · Graficos generados para %s\n", tkr))
   }
