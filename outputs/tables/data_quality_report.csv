@@ -1,0 +1,5 @@
+"ticker","n_raw","n_na","n_inf","n_nonpositive","n_duplicated","n_clean","n_returns","na_strategy","max_gap_days","n_gaps_flagged","pct_data_loss","date_from","date_to"
+"SPY",2427,0,0,0,0,2427,2426,"remove",4,0,0,"2017-01-03","2026-08-28"
+"TLT",2427,0,0,0,0,2427,2426,"remove",4,0,0,"2017-01-03","2026-08-28"
+"GLD",2427,0,0,0,0,2427,2426,"remove",4,0,0,"2017-01-03","2026-08-28"
+"BTC-USD",3529,2,0,0,0,3527,3526,"remove",3,0,0.0567,"2017-01-01","2026-08-30"
