@@ -1,0 +1,5 @@
+"ticker","orden_arma","modelo","diagnosis","metodo_pred","last_price","pred_price_h","segundos"
+"SPY","(2,0,2)","ARMA-GARCH(1,1)-t","APROBADO","ARMA-GARCH t-Student (nu=5.15)",769.349975585938,795.261186739115,2.76
+"TLT","(2,0,2)","ARMA-GARCH(1,1)-t","APROBADO","ARMA-GARCH t-Student (nu=15.47)",82.879997253418,82.9791008860845,2.51
+"GLD","(0,0,0)","ARMA-GARCH(1,1)-t","APROBADO","ARMA-GARCH t-Student (nu=5.67)",408.890014648438,415.512143291779,2.29
+"BTC-USD","(0,0,0)","ARMA-GARCH(1,1)-t","APROBADO","ARMA-GARCH t-Student (nu=3.26)",78034.03125,80395.4426383214,3.73
